@@ -10,17 +10,16 @@ get_training_sample <- function(cds,
                                 num_unknown,
                                 back_cutoff,
                                 training_cutoff,
-                                marker_scores,
-                                return_initial_assign) {
+                                marker_scores) {
 
   ##### Find type assignment from expressed/not expressed #####
 
   child_cell_types <- igraph::V(classifier@classification_tree)[
     suppressWarnings(outnei(curr_node)) ]$name
   assigns <- get_initial_assigns(child_cell_types, marker_scores, training_cutoff,
-                                 return_initial_assign=return_initial_assign)
+                                 return_initial_assign=FALSE)
 
-  if (is.null(assigns) || return_initial_assign) {
+  if (is.null(assigns)) {
     return(assigns)
   }
 

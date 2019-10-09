@@ -43,10 +43,10 @@
 #'  classifier. If possible for your organism, this should be "ENSEMBL", which
 #'  is the default. Ignored if db = "none".
 #' @param return_initial_assign Logical indicating whether an initial
-#'  assignment data frame for the root level should be returned instead of a
-#'  classifier. This can be useful while choosing/debugging markers. Please
-#'  note that this means that a classifier will not be built, so you will not
-#'  be able to move on to the next steps of the workflow until you rerun the
+#'  assignment data frame with assignments for all levels should be returned
+#'  instead of a classifier. This can be useful while choosing/debugging markers.
+#'  Please note that this means that a classifier will not be built, so you will
+#'  not be able to move on to the next steps of the workflow until you rerun the
 #'  functionwith \code{return_initial_assign = FALSE}. Default is \code{FALSE}.
 #'
 #' @details This function has three major parts: 1) parsing the marker file 2)
@@ -280,6 +280,13 @@ train_cell_classifier <- function(cds,
     }
   }
 
+  ##### Get initial assignments #####
+
+  if (return_initial_assign) {
+    return(get_score_assignment_table(classifier, marker_scores,
+                                      training_cutoff))
+  }
+
   ##### Train Classifier #####
 
   for (v in igraph::V(classifier@classification_tree)){
@@ -336,12 +343,7 @@ train_cell_classifier <- function(cds,
                                            num_unknown,
                                            back_cutoff,
                                            training_cutoff,
-                                           marker_scores,
-                                           return_initial_assign)
-
-    if(return_initial_assign) {
-      return(training_sample)
-    }
+                                           marker_scores)
 
     if (length(training_sample) > 0 & sum(training_sample != "Unknown") > 0) {
       # exclude useless genes
@@ -380,6 +382,36 @@ train_cell_classifier <- function(cds,
     }
   }
   return(classifier)
+}
+
+get_score_assignment_table <- function(classifier, marker_scores,
+                                       training_cutoff) {
+  initial_assigns <- lapply(igraph::V(classifier@classification_tree),
+                            function(v) {
+    child_cell_types <- igraph::V(classifier@classification_tree)[
+      suppressWarnings(outnei(v)) ]$name
+
+    get_initial_assigns(child_cell_types, marker_scores,
+                        training_cutoff, return_initial_assign=T)
+  })
+
+  initial_assigns <- initial_assigns[!sapply(initial_assigns, is.null)]
+  initial_assigns <- lapply(initial_assigns, function(x) x$Assignment)
+
+  for (cn in names(initial_assigns)[names(initial_assigns) != "root"]) {
+    path <- igraph::all_simple_paths(classifier@classification_tree, "root",
+                                     to = cn, mode = "out")[[1]]
+    path <- igraph::V(classifier@classification_tree)[path]$name;
+    for (i in 2:length(path)) {
+      initial_assigns[[path[[i]]]][
+        initial_assigns[[path[[i - 1]]]] != path[i]] <- "None"
+    }
+  }
+
+  initial_assigns <- as.data.frame(initial_assigns)
+  rownames(initial_assigns) <- rownames(marker_scores)
+
+  return(initial_assigns)
 }
 
 parse_input <- function(file_str,

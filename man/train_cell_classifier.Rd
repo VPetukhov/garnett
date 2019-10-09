@@ -59,10 +59,10 @@ classifier. If possible for your organism, this should be "ENSEMBL", which
 is the default. Ignored if db = "none".}
 
 \item{return_initial_assign}{Logical indicating whether an initial
-assignment data frame for the root level should be returned instead of a
-classifier. This can be useful while choosing/debugging markers. Please
-note that this means that a classifier will not be built, so you will not
-be able to move on to the next steps of the workflow until you rerun the
+assignment data frame with assignments for all levels should be returned
+instead of a classifier. This can be useful while choosing/debugging markers.
+Please note that this means that a classifier will not be built, so you will
+not be able to move on to the next steps of the workflow until you rerun the
 functionwith \code{return_initial_assign = FALSE}. Default is \code{FALSE}.}
 }
 \description{
