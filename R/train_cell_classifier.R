@@ -286,97 +286,97 @@ train_cell_classifier <- function(cds,
     child_cell_types <- igraph::V(classifier@classification_tree)[
       suppressWarnings(outnei(v))]$name
 
-    if(length(child_cell_types) > 0) {
-      ### Get CDS subset for training ###
-      if(igraph::V(classifier@classification_tree) [ v ]$name == "root") {
-        cds_sub <- norm_cds
-        orig_sub <- orig_cds
-      } else {
-        # loosely classify to subset
-        new_assign <-
-          make_predictions(norm_cds,
-                           classifier,
-                           igraph::V(classifier@classification_tree)[
-                             suppressWarnings(innei(v))]$name,
-                           rank_prob_ratio = 1.1,
-                           s = "lambda.min")
-        if(!igraph::V(classifier@classification_tree)[v]$name %in%
-           names(new_assign)) {
-          message(paste0("No cells classified as ",
-                         igraph::V(classifier@classification_tree) [ v ]$name,
-                         ". No subclassification"))
-          next
-        }
-        good_cells <-
-          as.matrix(new_assign[
-            igraph::V(classifier@classification_tree)[v]$name][[1]])
-        good_cells <- names(good_cells[good_cells[,1] != 0,])
-        if(length(good_cells) == 0) {
-          message(paste0("No cells classified as ",
-                         igraph::V(classifier@classification_tree) [ v ]$name,
-                         ". No subclassification"))
-          next
-        }
-        cds_sub <- norm_cds[,good_cells]
-        orig_sub <- orig_cds[,good_cells]
+    if(length(child_cell_types) == 0) {
+      next
+    }
+    ### Get CDS subset for training ###
+    if(igraph::V(classifier@classification_tree) [ v ]$name == "root") {
+      cds_sub <- norm_cds
+      orig_sub <- orig_cds
+    } else {
+      # loosely classify to subset
+      new_assign <-
+        make_predictions(norm_cds,
+                         classifier,
+                         igraph::V(classifier@classification_tree)[
+                           suppressWarnings(innei(v))]$name,
+                         rank_prob_ratio = 1.1,
+                         s = "lambda.min")
+      if(!igraph::V(classifier@classification_tree)[v]$name %in%
+         names(new_assign)) {
+        message(paste0("No cells classified as ",
+                       igraph::V(classifier@classification_tree) [ v ]$name,
+                       ". No subclassification"))
+        next
       }
-
-      ### Get training sample ###
-      training_sample <- get_training_sample(cds = cds_sub,
-                                             orig_cds = orig_sub,
-                                             classifier,
-                                             tf_idf,
-                                             gene_table,
-                                             v,
-                                             parse_list,
-                                             name_order,
-                                             max_training_samples,
-                                             num_unknown,
-                                             back_cutoff,
-                                             training_cutoff,
-                                             marker_scores,
-                                             return_initial_assign)
-
-      if(return_initial_assign) {
-        return(training_sample)
+      good_cells <-
+        as.matrix(new_assign[
+          igraph::V(classifier@classification_tree)[v]$name][[1]])
+      good_cells <- names(good_cells[good_cells[,1] != 0,])
+      if(length(good_cells) == 0) {
+        message(paste0("No cells classified as ",
+                       igraph::V(classifier@classification_tree) [ v ]$name,
+                       ". No subclassification"))
+        next
       }
+      cds_sub <- norm_cds[,good_cells]
+      orig_sub <- orig_cds[,good_cells]
+    }
 
-      if (length(training_sample) > 0 & sum(training_sample != "Unknown") > 0) {
-        # exclude useless genes
-        sub <- norm_cds[,names(training_sample[training_sample != "Unknown"])]
-        tf <- tfidf(sub)
-        temp <- training_sample[training_sample != "Unknown"]
-        y <- split.data.frame(as.matrix(tf), temp)
+    ### Get training sample ###
+    training_sample <- get_training_sample(cds = cds_sub,
+                                           orig_cds = orig_sub,
+                                           classifier,
+                                           tf_idf,
+                                           gene_table,
+                                           v,
+                                           parse_list,
+                                           name_order,
+                                           max_training_samples,
+                                           num_unknown,
+                                           back_cutoff,
+                                           training_cutoff,
+                                           marker_scores,
+                                           return_initial_assign)
 
-        rm <- lapply(y, colMeans)
-        rm[["Unknown"]] <- NULL
-        rm <- do.call(cbind, rm)
-        rm <- as.data.frame(rm)
-        rm$num_3q <- rowSums(rm > apply(rm, 2, stats::quantile,
-                                        p = rel_gene_quantile))
-        exclude <- row.names(rm[rm$num_3q == max(rm$num_3q),])
-        cds_sub <- cds_sub[setdiff(row.names(fData(cds_sub)), exclude),]
+    if(return_initial_assign) {
+      return(training_sample)
+    }
 
-        classifier <- train_glmnet(cds_sub,
-                                   classifier,
-                                   v,
-                                   training_sample,
-                                   min_observations = min_observations,
-                                   lambdas = lambdas,
-                                   cores = cores,
-                                   gene_table = gene_table,
-                                   perc_cells = perc_cells)
+    if (length(training_sample) > 0 & sum(training_sample != "Unknown") > 0) {
+      # exclude useless genes
+      sub <- norm_cds[,names(training_sample[training_sample != "Unknown"])]
+      tf <- tfidf(sub)
+      temp <- training_sample[training_sample != "Unknown"]
+      y <- split.data.frame(as.matrix(tf), temp)
 
-      } else {
-        if(igraph::V(classifier@classification_tree)[v]$name == "root") {
-          stop(paste("Not enough training samples for any cell types at root",
-                     "of cell type hierarchy!"))
-        }
-        message(paste0("Not enough training samples for children of ",
-                       igraph::V(classifier@classification_tree)[v]$name,
-                       ". They will not be subclassified."))
+      rm <- lapply(y, colMeans)
+      rm[["Unknown"]] <- NULL
+      rm <- do.call(cbind, rm)
+      rm <- as.data.frame(rm)
+      rm$num_3q <- rowSums(rm > apply(rm, 2, stats::quantile,
+                                      p = rel_gene_quantile))
+      exclude <- row.names(rm[rm$num_3q == max(rm$num_3q),])
+      cds_sub <- cds_sub[setdiff(row.names(fData(cds_sub)), exclude),]
+
+      classifier <- train_glmnet(cds_sub,
+                                 classifier,
+                                 v,
+                                 training_sample,
+                                 min_observations = min_observations,
+                                 lambdas = lambdas,
+                                 cores = cores,
+                                 gene_table = gene_table,
+                                 perc_cells = perc_cells)
+
+    } else {
+      if(igraph::V(classifier@classification_tree)[v]$name == "root") {
+        stop(paste("Not enough training samples for any cell types at root",
+                   "of cell type hierarchy!"))
       }
-
+      message(paste0("Not enough training samples for children of ",
+                     igraph::V(classifier@classification_tree)[v]$name,
+                     ". They will not be subclassified."))
     }
   }
   return(classifier)

@@ -17,22 +17,12 @@ get_training_sample <- function(cds,
 
   child_cell_types <- igraph::V(classifier@classification_tree)[
     suppressWarnings(outnei(curr_node)) ]$name
-  parent <- igraph::V(classifier@classification_tree)[curr_node]$name
-  if (length(child_cell_types) > 0) {
-    if (length(intersect(child_cell_types,
-                         colnames(marker_scores))) == 0) {
-      return(NULL)
-    }
-    assigns <- assign_type(marker_scores[,intersect(child_cell_types,
-                                                    colnames(marker_scores)),
-                                         drop=FALSE],
-                           training_cutoff, return_initial_assign)
-    if(return_initial_assign) {
-      return(assigns)
-    }
-  }
+  assigns <- get_initial_assigns(child_cell_types, marker_scores, training_cutoff,
+                                 return_initial_assign=return_initial_assign)
 
-  assigns <- as.data.frame(assigns)
+  if (is.null(assigns) || return_initial_assign) {
+    return(assigns)
+  }
 
   names(assigns) <- "assigns"
   pData(orig_cds)$assigns <- assigns[row.names(pData(orig_cds)),"assigns"]
@@ -125,7 +115,21 @@ get_training_sample <- function(cds,
   return(training_sample)
 }
 
+get_initial_assigns <- function(child_cell_types, marker_scores, training_cutoff,
+                                return_initial_assign) {
+  if (length(child_cell_types) == 0) {
+    return(NULL)
+  }
 
+  cur_types <- intersect(child_cell_types, colnames(marker_scores))
+  if (length(cur_types) == 0) {
+      return(NULL)
+  }
+
+  assigns <- assign_type(marker_scores[, cur_types, drop=FALSE],
+                         training_cutoff, return_initial_assign)
+  return(as.data.frame(assigns))
+}
 
 assign_type <- function(total_vals,
                         training_cutoff,
