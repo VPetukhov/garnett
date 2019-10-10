@@ -283,8 +283,16 @@ train_cell_classifier <- function(cds,
   ##### Get initial assignments #####
 
   if (return_initial_assign) {
-    return(get_score_assignment_table(classifier, marker_scores,
-                                      training_cutoff))
+    marker_scores$cell <- NULL
+    res <- list(
+      scores=marker_scores,
+      assigns=get_score_assignment_table(classifier, marker_scores,
+                                         training_cutoff),
+      classification_tree=classifier@classification_tree,
+      gene_table=gene_table,
+      parse_list=parse_list
+    )
+    return(res)
   }
 
   ##### Train Classifier #####

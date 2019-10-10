@@ -277,9 +277,14 @@ run_classifier <- function(classifier,
           type_res <- type_res[[1]]
         }
 
-        curr_assignments[Matrix::which(type_res == TRUE)] <- cell_type
+        new_assignment_mask <- (type_res == 1)
+        if (length(parents) > 1) {
+          new_assignment_mask <- new_assignment_mask & (curr_assignments != "Unknown")
+        }
 
-        level_table[[curr_level]][Matrix::which(type_res == TRUE)] <- cell_type
+        curr_assignments[Matrix::which(new_assignment_mask)] <- cell_type
+
+        level_table[[curr_level]][Matrix::which(new_assignment_mask)] <- cell_type
         level_table <- fill_in_assignments(curr_assignments, classifier, child,
                                            imputed_gate_res, level_table)
       }
