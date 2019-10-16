@@ -108,7 +108,8 @@ train_cell_classifier <- function(cds,
                                   cores=1,
                                   lambdas = NULL,
                                   classifier_gene_id_type = "ENSEMBL",
-                                  return_initial_assign = FALSE) {
+                                  return_initial_assign = FALSE,
+                                  return_initial_classifier = FALSE) {
 
   ##### Check inputs #####
   assertthat::assert_that(is(cds, "CellDataSet"))
@@ -254,6 +255,15 @@ train_cell_classifier <- function(cds,
   classifier@cell_totals <- exp(mean(log(cell_totals)))/
     stats::median(pData(norm_cds)$num_genes_expressed)
 
+  if (return_initial_classifier) {
+    res <- list(
+      classification_tree=classifier@classification_tree,
+      gene_table=gene_table,
+      parse_list=parse_list
+    )
+    return(res)
+  }
+
   ##### Create transformed marker table #####
   if(propogate_markers) {
     root <- propogate_func(curr_node = "root", parse_list, classifier)
@@ -284,13 +294,16 @@ train_cell_classifier <- function(cds,
 
   if (return_initial_assign) {
     marker_scores$cell <- NULL
+    pos_marker_scores <- lapply(parse_list, aggregate_positive_markers,
+                                tf_idf, gene_table, back_cutoff, agg=F)
     res <- list(
       scores=marker_scores,
       assigns=get_score_assignment_table(classifier, marker_scores,
                                          training_cutoff),
       classification_tree=classifier@classification_tree,
       gene_table=gene_table,
-      parse_list=parse_list
+      parse_list=parse_list,
+      pos_marker_scores=pos_marker_scores
     )
     return(res)
   }
@@ -618,12 +631,11 @@ propogate_func <- function(curr_node,
 }
 
 tfidf <- function(input_cds) {
-  ncounts <- exprs(input_cds)
-  ncounts <- ncounts[Matrix::rowSums(ncounts) != 0,]
-  nfreqs <- ncounts
-  nfreqs@x <- ncounts@x / rep.int(Matrix::colSums(ncounts), diff(ncounts@p))
-  tf_idf_counts <- nfreqs * log(1 + ncol(ncounts) / Matrix::rowSums(ncounts))
-  Matrix::t(tf_idf_counts)
+  nfreqs <- exprs(input_cds)
+  nfreqs@x <- nfreqs@x / rep.int(Matrix::colSums(nfreqs), diff(nfreqs@p))
+  nfreqs <- Matrix::t(nfreqs)
+  nfreqs@x <- nfreqs@x * rep(log(1 + nrow(nfreqs) / (Matrix::colSums(nfreqs > 0) + 1)), diff(nfreqs@p))
+  return(nfreqs)
 }
 
 train_glmnet <- function(cds,
